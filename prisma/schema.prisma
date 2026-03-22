@@ -1,0 +1,142 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum RaceStatus {
+  PENDING
+  RUNNING
+  FINISHED
+}
+
+enum TeamStrategy {
+  GENERAL_CLASSIFICATION
+  SPRINT_STAGE
+  BREAKAWAY
+  BALANCED
+}
+
+enum SegmentType {
+  flat
+  climb
+  descent
+}
+
+enum WindDirection {
+  head
+  tail
+  cross
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model Team {
+  id            String       @id @default(uuid())
+  name          String
+  strategy      TeamStrategy
+  leaderId      String
+  domestiqueIds String[]
+  createdAt     DateTime     @default(now())
+
+  cyclists  Cyclist[]
+  raceTeams RaceTeam[]
+
+  @@map("teams")
+}
+
+model Cyclist {
+  id          String   @id @default(uuid())
+  name        String
+  teamId      String
+  team        Team     @relation(fields: [teamId], references: [id])
+  stamina     Int
+  performance Int
+  climbing    Int
+  sprint      Int
+  vigilance   Int
+  resistance  Int
+  recovery    Int
+  createdAt   DateTime @default(now())
+
+  cyclistSnapshots CyclistSnapshot[]
+
+  @@map("cyclists")
+}
+
+model Race {
+  id            String     @id @default(uuid())
+  name          String
+  totalDistance Float
+  status        RaceStatus @default(PENDING)
+  seed          Int?
+  cyclistIds    String[]   @default([])
+  createdAt     DateTime   @default(now())
+  finishedAt    DateTime?
+
+  segments  Segment[]
+  raceTeams RaceTeam[]
+  snapshots RaceSnapshot[]
+
+  @@map("races")
+}
+
+model RaceTeam {
+  raceId String
+  teamId String
+  race   Race   @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  team   Team   @relation(fields: [teamId], references: [id])
+
+  @@id([raceId, teamId])
+  @@map("race_teams")
+}
+
+model Segment {
+  id            String        @id @default(uuid())
+  raceId        String
+  race          Race          @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  startKm       Float
+  endKm         Float
+  type          SegmentType
+  gradient      Float
+  windDirection WindDirection?
+  windStrength  Float?
+
+  @@map("segments")
+}
+
+model RaceSnapshot {
+  id     String @id @default(uuid())
+  raceId String
+  race   Race   @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  km     Float
+
+  cyclistSnapshots CyclistSnapshot[]
+
+  @@unique([raceId, km])
+  @@index([raceId])
+  @@map("race_snapshots")
+}
+
+model CyclistSnapshot {
+  id         String       @id @default(uuid())
+  snapshotId String
+  snapshot   RaceSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  cyclistId  String
+  cyclist    Cyclist      @relation(fields: [cyclistId], references: [id])
+  position   Float
+  speed      Float
+  energy     Float
+  fatigue    Float
+  intent         String?
+  groupId        String?
+  isDropped      Boolean @default(false)
+  finishPosition Int?
+
+  @@index([snapshotId])
+  @@map("cyclist_snapshots")
+}

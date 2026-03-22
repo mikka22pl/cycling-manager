@@ -6,15 +6,15 @@ Base URL: `http://localhost:3000`
 
 ## Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/race` | List all races (summary) |
-| `POST` | `/race/start` | Create a new race |
-| `GET` | `/race/:id` | Get full race state |
-| `POST` | `/race/:id/simulate` | Run the simulation |
-| `GET` | `/race/:id/snapshots` | Get all simulation snapshots |
-| `GET` | `/race/:id/snapshots/at?km=N` | Get snapshot at a specific km |
-| `GET` | `/race/:id/leaderboard` | Final leaderboard (sorted by position) |
+| Method | Path                          | Description                            |
+| ------ | ----------------------------- | -------------------------------------- |
+| `GET`  | `/race`                       | List all races (summary)               |
+| `POST` | `/race/start`                 | Create a new race                      |
+| `GET`  | `/race/:id`                   | Get full race state                    |
+| `POST` | `/race/:id/simulate`          | Run the simulation                     |
+| `GET`  | `/race/:id/snapshots`         | Get all simulation snapshots           |
+| `GET`  | `/race/:id/snapshots/at?km=N` | Get snapshot at a specific km          |
+| `GET`  | `/race/:id/leaderboard`       | Final leaderboard (sorted by position) |
 
 ---
 
@@ -23,6 +23,7 @@ Base URL: `http://localhost:3000`
 Returns a summary array of all races created in the current session.
 
 **Response**
+
 ```json
 [
   {
@@ -43,6 +44,7 @@ Returns a summary array of all races created in the current session.
 Defines the race geometry, teams, and cyclists. Returns the new race object with `status: "PENDING"`.
 
 **Request body**
+
 ```json
 {
   "name": "Tour de France Stage 8",
@@ -139,26 +141,27 @@ Defines the race geometry, teams, and cyclists. Returns the new race object with
 
 **Stat guide (all 0–100)**
 
-| Stat | Effect |
-|------|--------|
-| `stamina` | Starting energy pool |
-| `performance` | General power output |
-| `climbing` | Speed efficiency on climbs |
-| `sprint` | Sprint boost in final 3 km |
-| `vigilance` | Positioning awareness, attack reaction |
-| `resistance` | Crash/fatigue resilience |
-| `recovery` | Slows fatigue accumulation |
+| Stat          | Effect                                 |
+| ------------- | -------------------------------------- |
+| `stamina`     | Starting energy pool                   |
+| `performance` | General power output                   |
+| `climbing`    | Speed efficiency on climbs             |
+| `sprint`      | Sprint boost in final 3 km             |
+| `vigilance`   | Positioning awareness, attack reaction |
+| `resistance`  | Crash/fatigue resilience               |
+| `recovery`    | Slows fatigue accumulation             |
 
 **Team strategies**
 
-| Strategy | Behaviour |
-|----------|-----------|
+| Strategy                 | Behaviour                                         |
+| ------------------------ | ------------------------------------------------- |
 | `GENERAL_CLASSIFICATION` | Leader conserves energy; domestiques control pace |
-| `SPRINT_STAGE` | Controls peloton; sprinter saved for the finish |
-| `BREAKAWAY` | Attacks early and often |
-| `BALANCED` | No special bias |
+| `SPRINT_STAGE`           | Controls peloton; sprinter saved for the finish   |
+| `BREAKAWAY`              | Attacks early and often                           |
+| `BALANCED`               | No special bias                                   |
 
 **Response** – `201 Created`
+
 ```json
 {
   "id": "e222978e-edbb-4191-81e5-56f196260ad7",
@@ -181,6 +184,7 @@ Defines the race geometry, teams, and cyclists. Returns the new race object with
 Returns the full race object including current cyclist states and all snapshots.
 
 **curl example**
+
 ```bash
 curl http://localhost:3000/race/e222978e-edbb-4191-81e5-56f196260ad7
 ```
@@ -192,6 +196,7 @@ curl http://localhost:3000/race/e222978e-edbb-4191-81e5-56f196260ad7
 Runs the engine loop and produces snapshots. Call once per race (idempotent error if already finished).
 
 **Request body** (optional – override seed)
+
 ```json
 { "seed": 1234 }
 ```
@@ -199,6 +204,7 @@ Runs the engine loop and produces snapshots. Call once per race (idempotent erro
 **Response** – `200 OK` – full race object with `status: "FINISHED"` and all snapshots populated.
 
 **curl example**
+
 ```bash
 curl -s -X POST http://localhost:3000/race/RACE_ID/simulate \
   -H "Content-Type: application/json" \
@@ -206,6 +212,7 @@ curl -s -X POST http://localhost:3000/race/RACE_ID/simulate \
 ```
 
 **Snapshot structure**
+
 ```json
 {
   "km": 60,
@@ -214,7 +221,7 @@ curl -s -X POST http://localhost:3000/race/RACE_ID/simulate \
       "id": "rider-1",
       "name": "Marco Alpe",
       "teamId": "team-gc",
-      "position": 60.000,
+      "position": 60.0,
       "speed": 28.45,
       "energy": 77.3,
       "intent": "PROTECT_LEADER",
@@ -227,24 +234,24 @@ curl -s -X POST http://localhost:3000/race/RACE_ID/simulate \
 
 **Snapshot schedule** (for a 150 km race)
 
-| Range | Step | # snapshots |
-|-------|------|-------------|
-| 0–100 km | every 10 km | 10 |
-| 100–140 km | every 5 km | 8 |
-| 140–150 km | every 1 km | 10 |
+| Range      | Step        | # snapshots |
+| ---------- | ----------- | ----------- |
+| 0–100 km   | every 10 km | 10          |
+| 100–140 km | every 5 km  | 8           |
+| 140–150 km | every 1 km  | 10          |
 
 **Intent values**
 
-| Intent | Meaning |
-|--------|---------|
-| `FOLLOW_PELOTON` | Sitting in the bunch |
-| `SAVE_ENERGY` | Conserving (low energy) |
-| `CHASE` | Chasing a breakaway |
-| `ATTACK` | Attacking off the front |
-| `BREAKAWAY` | In an established breakaway |
-| `PROTECT_LEADER` | Domestique shielding leader |
-| `SPRINT_PREP` | Building for sprint (<10 km) |
-| `SPRINT` | Full sprint (<3 km) |
+| Intent           | Meaning                      |
+| ---------------- | ---------------------------- |
+| `FOLLOW_PELOTON` | Sitting in the bunch         |
+| `SAVE_ENERGY`    | Conserving (low energy)      |
+| `CHASE`          | Chasing a breakaway          |
+| `ATTACK`         | Attacking off the front      |
+| `BREAKAWAY`      | In an established breakaway  |
+| `PROTECT_LEADER` | Domestique shielding leader  |
+| `SPRINT_PREP`    | Building for sprint (<10 km) |
+| `SPRINT`         | Full sprint (<3 km)          |
 
 ---
 
@@ -253,6 +260,7 @@ curl -s -X POST http://localhost:3000/race/RACE_ID/simulate \
 Returns the full snapshot array.
 
 **curl example**
+
 ```bash
 curl http://localhost:3000/race/RACE_ID/snapshots
 ```
@@ -266,11 +274,13 @@ Returns a single snapshot at the exact km mark.
 Valid km values are those produced by the step schedule (e.g., 10, 20, …, 100, 105, …, 140, 141, …, 150).
 
 **curl example**
+
 ```bash
 curl "http://localhost:3000/race/RACE_ID/snapshots/at?km=60"
 ```
 
 **Response**
+
 ```json
 {
   "km": 60,
@@ -285,11 +295,13 @@ curl "http://localhost:3000/race/RACE_ID/snapshots/at?km=60"
 Returns cyclists sorted by final position (leader first). Only available after simulation.
 
 **curl example**
+
 ```bash
 curl http://localhost:3000/race/RACE_ID/leaderboard
 ```
 
 **Response**
+
 ```json
 [
   {
@@ -381,10 +393,10 @@ curl -s http://localhost:3000/race/$RACE_ID/leaderboard
 
 ## Error responses
 
-| Status | Situation |
-|--------|-----------|
-| `404 Not Found` | Unknown race id or snapshot km |
-| `409 Conflict` | Simulating a race that is already RUNNING or FINISHED |
+| Status          | Situation                                             |
+| --------------- | ----------------------------------------------------- |
+| `404 Not Found` | Unknown race id or snapshot km                        |
+| `409 Conflict`  | Simulating a race that is already RUNNING or FINISHED |
 
 ---
 

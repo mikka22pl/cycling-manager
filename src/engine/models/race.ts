@@ -14,6 +14,7 @@ export type RaceSnapshot = {
     intent?: string;
     groupId?: string;
     isDropped: boolean;
+    finishPosition?: number;
   }[];
 };
 

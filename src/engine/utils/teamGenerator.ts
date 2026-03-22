@@ -1,12 +1,15 @@
 import { v4 as uuidv4 } from 'uuid';
-import { faker } from '@faker-js/faker';
 import { SeededRandom, createRng } from './random';
 import { Cyclist, CyclistStats, CyclistDynamic } from '../models/cyclist';
 import { TeamWithRiders } from '../models/team';
+import { allFakers } from '@faker-js/faker';
+import { NATIONALITIES } from '../config/nationality.config';
 
 export interface GenerateTeamOptions {
   name?: string;
   seed?: number;
+  numberOfRiders?: number;
+  nationality?: string;
 }
 
 type StatRanges = {
@@ -23,58 +26,58 @@ type Archetype =
 
 const ARCHETYPE_RANGES: Record<Archetype, StatRanges> = {
   GC_LEADER: {
-    stamina:     [82, 92],
+    stamina: [82, 92],
     performance: [80, 90],
-    climbing:    [78, 90],
-    sprint:      [50, 70],
-    vigilance:   [72, 85],
-    resistance:  [68, 80],
-    recovery:    [75, 88],
+    climbing: [78, 90],
+    sprint: [50, 70],
+    vigilance: [72, 85],
+    resistance: [68, 80],
+    recovery: [75, 88],
   },
   LIEUTENANT: {
-    stamina:     [74, 86],
+    stamina: [74, 86],
     performance: [72, 84],
-    climbing:    [65, 80],
-    sprint:      [55, 72],
-    vigilance:   [65, 80],
-    resistance:  [65, 78],
-    recovery:    [68, 80],
+    climbing: [65, 80],
+    sprint: [55, 72],
+    vigilance: [65, 80],
+    resistance: [65, 78],
+    recovery: [68, 80],
   },
   CLIMBER: {
-    stamina:     [72, 84],
+    stamina: [72, 84],
     performance: [65, 80],
-    climbing:    [80, 95],
-    sprint:      [30, 50],
-    vigilance:   [55, 70],
-    resistance:  [55, 72],
-    recovery:    [70, 84],
+    climbing: [80, 95],
+    sprint: [30, 50],
+    vigilance: [55, 70],
+    resistance: [55, 72],
+    recovery: [70, 84],
   },
   SPRINTER: {
-    stamina:     [65, 78],
+    stamina: [65, 78],
     performance: [72, 85],
-    climbing:    [30, 50],
-    sprint:      [85, 100],
-    vigilance:   [65, 80],
-    resistance:  [60, 75],
-    recovery:    [60, 75],
+    climbing: [30, 50],
+    sprint: [85, 100],
+    vigilance: [65, 80],
+    resistance: [60, 75],
+    recovery: [60, 75],
   },
   LEAD_OUT: {
-    stamina:     [70, 82],
+    stamina: [70, 82],
     performance: [65, 78],
-    climbing:    [40, 58],
-    sprint:      [68, 82],
-    vigilance:   [78, 92],
-    resistance:  [65, 78],
-    recovery:    [62, 76],
+    climbing: [40, 58],
+    sprint: [68, 82],
+    vigilance: [78, 92],
+    resistance: [65, 78],
+    recovery: [62, 76],
   },
   DOMESTIQUE: {
-    stamina:     [65, 78],
+    stamina: [65, 78],
     performance: [58, 72],
-    climbing:    [50, 68],
-    sprint:      [45, 62],
-    vigilance:   [55, 70],
-    resistance:  [62, 78],
-    recovery:    [60, 74],
+    climbing: [50, 68],
+    sprint: [45, 62],
+    vigilance: [55, 70],
+    resistance: [62, 78],
+    recovery: [60, 74],
   },
 };
 
@@ -100,13 +103,17 @@ function applyAgeModifier(stat: number, age: number): number {
 
 function rollStats(rng: SeededRandom, ranges: StatRanges): CyclistStats {
   return {
-    stamina:     Math.floor(rng.range(ranges.stamina[0],     ranges.stamina[1])),
-    performance: Math.floor(rng.range(ranges.performance[0], ranges.performance[1])),
-    climbing:    Math.floor(rng.range(ranges.climbing[0],    ranges.climbing[1])),
-    sprint:      Math.floor(rng.range(ranges.sprint[0],      ranges.sprint[1])),
-    vigilance:   Math.floor(rng.range(ranges.vigilance[0],   ranges.vigilance[1])),
-    resistance:  Math.floor(rng.range(ranges.resistance[0],  ranges.resistance[1])),
-    recovery:    Math.floor(rng.range(ranges.recovery[0],    ranges.recovery[1])),
+    stamina: Math.floor(rng.range(ranges.stamina[0], ranges.stamina[1])),
+    performance: Math.floor(
+      rng.range(ranges.performance[0], ranges.performance[1]),
+    ),
+    climbing: Math.floor(rng.range(ranges.climbing[0], ranges.climbing[1])),
+    sprint: Math.floor(rng.range(ranges.sprint[0], ranges.sprint[1])),
+    vigilance: Math.floor(rng.range(ranges.vigilance[0], ranges.vigilance[1])),
+    resistance: Math.floor(
+      rng.range(ranges.resistance[0], ranges.resistance[1]),
+    ),
+    recovery: Math.floor(rng.range(ranges.recovery[0], ranges.recovery[1])),
   };
 }
 
@@ -120,59 +127,96 @@ function makeInitialDynamic(stamina: number): CyclistDynamic {
   };
 }
 
+const DEFAULT_LOCALE = 'en';
+const DEFAULT_NATIONALITY = 'GBR';
+type FakerLocale = keyof typeof allFakers;
+
 function makeCyclist(
   rng: SeededRandom,
   archetype: Archetype,
   teamId: string,
+  nationality?: string,
 ): Cyclist {
   const age = gaussianAge(rng);
   const raw = rollStats(rng, ARCHETYPE_RANGES[archetype]);
   const stats: CyclistStats = {
-    stamina:     applyAgeModifier(raw.stamina,     age),
+    stamina: applyAgeModifier(raw.stamina, age),
     performance: applyAgeModifier(raw.performance, age),
-    climbing:    applyAgeModifier(raw.climbing,    age),
-    sprint:      applyAgeModifier(raw.sprint,      age),
-    vigilance:   applyAgeModifier(raw.vigilance,   age),
-    resistance:  applyAgeModifier(raw.resistance,  age),
-    recovery:    applyAgeModifier(raw.recovery,    age),
+    climbing: applyAgeModifier(raw.climbing, age),
+    sprint: applyAgeModifier(raw.sprint, age),
+    vigilance: applyAgeModifier(raw.vigilance, age),
+    resistance: applyAgeModifier(raw.resistance, age),
+    recovery: applyAgeModifier(raw.recovery, age),
   };
+  const rawLocale =
+    nationality && NATIONALITIES[nationality]
+      ? NATIONALITIES[nationality].locale
+      : DEFAULT_LOCALE;
+  const locale = (
+    rawLocale in allFakers ? rawLocale : DEFAULT_LOCALE
+  ) as FakerLocale;
+  const faker = allFakers[locale];
+  const fullName = `${faker.person.firstName('male')} ${faker.person.lastName('male')}`;
   return {
     id: uuidv4(),
-    name: faker.person.fullName({ sex: 'male' }),
+    name: fullName,
+    nationality,
     teamId,
     stats,
     dynamic: makeInitialDynamic(stats.stamina),
   };
 }
 
+const CORE_ARCHETYPES: Archetype[] = [
+  'GC_LEADER',
+  'LIEUTENANT',
+  'CLIMBER',
+  'CLIMBER',
+  'SPRINTER',
+  'LEAD_OUT',
+];
+
+function buildArchetypes(count: number): Archetype[] {
+  const archetypes = CORE_ARCHETYPES.slice(0, count);
+  while (archetypes.length < count) {
+    archetypes.push('DOMESTIQUE');
+  }
+  return archetypes;
+}
+
 /**
- * Generates a fully-formed 9-rider team with realistic archetype distribution:
- * 1 GC Leader, 1 Lieutenant, 2 Climbers, 1 Sprinter, 1 Lead-out, 3 Domestiques.
+ * Generates a fully-formed team with realistic archetype distribution.
+ * Core roles: GC Leader, Lieutenant, 2 Climbers, Sprinter, Lead-out.
+ * Remaining slots filled with Domestiques. Defaults to 8 riders.
  */
-export function generateTeam(options: GenerateTeamOptions = {}): TeamWithRiders {
+export function generateTeam(
+  options: GenerateTeamOptions = {},
+): TeamWithRiders {
+  const nationality = options.nationality ?? DEFAULT_NATIONALITY;
+  const configNationality = NATIONALITIES[nationality];
   const rng = createRng(options.seed);
   const teamId = uuidv4();
-  const teamName = options.name ?? faker.company.name();
+  const rawTeamLocale = configNationality?.locale ?? DEFAULT_LOCALE;
+  const teamLocale = (
+    rawTeamLocale in allFakers ? rawTeamLocale : DEFAULT_LOCALE
+  ) as FakerLocale;
+  const teamName = options.name ?? allFakers[teamLocale].company.name();
+  const count = options.numberOfRiders ?? 8;
 
-  const archetypes: Archetype[] = [
-    'GC_LEADER',
-    'LIEUTENANT',
-    'CLIMBER',
-    'CLIMBER',
-    'SPRINTER',
-    'LEAD_OUT',
-    'DOMESTIQUE',
-    'DOMESTIQUE',
-    'DOMESTIQUE',
-  ];
+  const archetypes = buildArchetypes(count);
+  const riders = archetypes.map((archetype) =>
+    makeCyclist(rng, archetype, teamId, nationality),
+  );
 
-  const riders = archetypes.map((archetype) => makeCyclist(rng, archetype, teamId));
+  const domestiqueIds = riders
+    .filter((_, i) => archetypes[i] === 'DOMESTIQUE')
+    .map((r) => r.id);
 
   return {
     id: teamId,
     name: teamName,
     leaderId: riders[0].id,
-    domestiqueIds: riders.slice(6).map((r) => r.id),
+    domestiqueIds,
     strategy: 'GENERAL_CLASSIFICATION',
     riders,
   };
