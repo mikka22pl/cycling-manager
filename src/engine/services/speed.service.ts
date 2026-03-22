@@ -31,8 +31,7 @@ export function computeSpeed(
   }
 
   // --- Drafting: reduces effective effort cost, modelled as energy bonus ---
-  const draftingBonus =
-    groupSize >= 5 ? 1.25 : groupSize >= 2 ? 1.1 : 1;
+  const draftingBonus = groupSize >= 5 ? 1.25 : groupSize >= 2 ? 1.1 : 1;
   const effectiveEnergy = Math.min((energy / 100) * draftingBonus, 1);
 
   // --- Power ---
@@ -42,8 +41,7 @@ export function computeSpeed(
   const sprintBoost = 0; // injected upstream via effort
 
   // --- Final speed ---
-  const rawSpeed =
-    BASE_SPEED * power * terrainFactor * (1 + sprintBoost);
+  const rawSpeed = BASE_SPEED * power * terrainFactor * (1 + sprintBoost);
 
   // Wind effect
   let windFactor = 1;

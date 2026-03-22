@@ -26,12 +26,12 @@ export function decideEffort(
   remainingKm: number,
   rng: SeededRandom,
 ): EffortDecision {
-  const { performance, vigilance, resistance, recovery, sprint } = cyclist.stats;
+  const { performance, vigilance, resistance, recovery, sprint } =
+    cyclist.stats;
   const { energy, groupId } = cyclist.dynamic;
 
   // ---- Race phase ----
-  const racePhase: number =
-    remainingKm > 50 ? 0 : remainingKm > 10 ? 0.2 : 0.5;
+  const racePhase: number = remainingKm > 50 ? 0 : remainingKm > 10 ? 0.2 : 0.5;
 
   // ---- Situation pressure (higher when behind) ----
   const sortedByPos = [...allCyclists].sort(
@@ -96,11 +96,7 @@ export function decideEffort(
 
   // Mental decision modulator (±5%)
   const mentalModifier = decisionScore * 0.1;
-  effort = clamp(
-    effort + mentalModifier + rng.range(-0.05, 0.05),
-    0.6,
-    1.2,
-  );
+  effort = clamp(effort + mentalModifier + rng.range(-0.05, 0.05), 0.6, 1.2);
 
   // Archetype adjustments
   const isAggressive = performance + vigilance > 140;

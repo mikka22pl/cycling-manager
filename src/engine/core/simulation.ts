@@ -7,6 +7,7 @@ import { computeFatigueUpdate } from '../services/fatigue.service';
 import { resolveGroups } from '../services/group.service';
 import { decideEffort } from '../services/tactics.service';
 import { createRng, SeededRandom } from '../utils/random';
+import { Logger } from '@nestjs/common';
 
 /** Finds the segment that covers a given km point. */
 function getSegmentAt(segments: Segment[], km: number): Segment {
@@ -90,8 +91,7 @@ export function runSimulation(race: Race): RaceSnapshot[] {
       // Compute group size for drafting (use previous step's groups)
       const groupSize = race.cyclists.filter(
         (c) =>
-          !c.dynamic.isDropped &&
-          c.dynamic.groupId === cyclist.dynamic.groupId,
+          !c.dynamic.isDropped && c.dynamic.groupId === cyclist.dynamic.groupId,
       ).length;
 
       const speed = computeSpeed(
@@ -114,10 +114,11 @@ export function runSimulation(race: Race): RaceSnapshot[] {
       cyclist.dynamic.energy = energy;
 
       // Advance position by step distance (all active riders cover the step)
-      cyclist.dynamic.position = parseFloat(
-        (currentKm + stepKm).toFixed(3),
-      );
+      cyclist.dynamic.position = parseFloat((currentKm + stepKm).toFixed(3));
+      // cyclist.dynamic.position +=
+      // cyclist.dynamic.speed * (stepKm / cyclist.dynamic.speed);
 
+      // Logger.log('cyclist position ' + cyclist.dynamic.position);
       // Mark as dropped if energy completely depleted
       if (energy <= 0) {
         cyclist.dynamic.isDropped = true;
@@ -134,6 +135,31 @@ export function runSimulation(race: Race): RaceSnapshot[] {
 
     currentKm += stepKm;
   }
+
+  // --- Final sprint tiebreaker ---
+  const finishers = race.cyclists.filter((c) => !c.dynamic.isDropped);
+  const dropped = race.cyclists.filter((c) => c.dynamic.isDropped);
+
+  // Score: 50% sprint stat, 30% remaining energy, 20% seeded randomness
+  const scored = finishers
+    .map((c) => ({
+      id: c.id,
+      score:
+        (c.stats.sprint / 100) * 0.5 +
+        (c.dynamic.energy / 100) * 0.3 +
+        rng.range(0, 0.2),
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  const lastSnapshot = race.snapshots[race.snapshots.length - 1];
+  scored.forEach((s, idx) => {
+    const entry = lastSnapshot.cyclists.find((c) => c.id === s.id);
+    if (entry) entry.finishPosition = idx + 1;
+  });
+  dropped.forEach((c, idx) => {
+    const entry = lastSnapshot.cyclists.find((e) => e.id === c.id);
+    if (entry) entry.finishPosition = finishers.length + 1 + idx;
+  });
 
   return race.snapshots;
 }

@@ -31,6 +31,7 @@ export type CyclistDynamic = {
 export type Cyclist = {
   id: string;
   name: string;
+  nationality?: string;
   teamId: string;
   stats: CyclistStats;
   dynamic: CyclistDynamic;

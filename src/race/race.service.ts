@@ -1,117 +1,221 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
-import { v4 as uuidv4 } from 'uuid';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
 import { Race } from '../engine/models/race';
-import { Cyclist } from '../engine/models/cyclist';
 import { runSimulation } from '../engine/core/simulation';
 import { CreateRaceDto, SimulateRaceDto } from './race.dto';
+import {
+  toEngineRace,
+  toEngineSnapshot,
+  toCyclistSnapshotInputs,
+} from './race.mapper';
 
-/**
- * In-memory store – no database.
- * All races live for the lifetime of the process.
- */
+/** Full include shape for a race with teams, cyclists, and segments. */
+const RACE_WITH_RELATIONS = {
+  segments: true,
+  raceTeams: { include: { team: { include: { cyclists: true } } } },
+} as const;
+
+/** Full include shape for a snapshot with its cyclist rows and parent cyclists. */
+const SNAPSHOT_WITH_CHILDREN = {
+  cyclistSnapshots: { include: { cyclist: true } },
+} as const;
+
 @Injectable()
 export class RaceService {
-  private readonly store = new Map<string, Race>();
+  constructor(private readonly prisma: PrismaService) {}
 
-  createRace(dto: CreateRaceDto): Race {
-    const id = uuidv4();
+  async createRace(dto: CreateRaceDto): Promise<Race> {
+    // Verify all teams exist.
+    const teams = await this.prisma.team.findMany({
+      where: { id: { in: dto.teamIds } },
+    });
+    if (teams.length !== dto.teamIds.length) {
+      const missing = dto.teamIds.filter((id) => !teams.find((t) => t.id === id));
+      throw new NotFoundException(`Teams not found: ${missing.join(', ')}`);
+    }
 
-    const cyclists: Cyclist[] = dto.cyclists.map((c) => ({
-      id: c.id,
-      name: c.name,
-      teamId: c.teamId,
-      stats: { ...c.stats },
-      dynamic: {
-        energy: c.stats.stamina,
-        fatigue: 0,
-        position: 0,
-        speed: 0,
-        isDropped: false,
+    // Verify all cyclists exist and belong to the provided teams.
+    const cyclists = await this.prisma.cyclist.findMany({
+      where: { id: { in: dto.cyclistIds } },
+    });
+    if (cyclists.length !== dto.cyclistIds.length) {
+      const missing = dto.cyclistIds.filter((id) => !cyclists.find((c) => c.id === id));
+      throw new NotFoundException(`Cyclists not found: ${missing.join(', ')}`);
+    }
+    const teamIdSet = new Set(dto.teamIds);
+    const orphans = cyclists.filter((c) => !teamIdSet.has(c.teamId));
+    if (orphans.length > 0) {
+      throw new UnprocessableEntityException(
+        `Cyclists do not belong to the provided teams: ${orphans.map((c) => c.id).join(', ')}`,
+      );
+    }
+
+    // Create the race with its segments, team junctions, and cyclist roster.
+    const dbRace = await this.prisma.race.create({
+      data: {
+        name: dto.name,
+        totalDistance: dto.totalDistance,
+        seed: dto.seed,
+        cyclistIds: dto.cyclistIds,
+        segments: {
+          create: dto.segments.map((s) => ({
+            startKm: s.startKm,
+            endKm: s.endKm,
+            type: s.type,
+            gradient: s.gradient,
+            windDirection: s.wind?.direction ?? null,
+            windStrength: s.wind?.strength ?? null,
+          })),
+        },
+        raceTeams: {
+          create: dto.teamIds.map((teamId) => ({ teamId })),
+        },
       },
-    }));
+      include: RACE_WITH_RELATIONS,
+    });
 
-    const race: Race = {
-      id,
-      name: dto.name,
-      totalDistance: dto.totalDistance,
-      segments: dto.segments.map((s) => ({ ...s })),
-      teams: dto.teams.map((t) => ({ ...t })),
-      cyclists,
-      snapshots: [],
-      status: 'PENDING',
-      seed: dto.seed,
-      createdAt: new Date().toISOString(),
-    };
-
-    this.store.set(id, race);
-    return race;
+    return toEngineRace(dbRace);
   }
 
-  simulate(id: string, dto?: SimulateRaceDto): Race {
-    const race = this.getRace(id);
+  async simulate(id: string, dto?: SimulateRaceDto): Promise<Race> {
+    const dbRace = await this.prisma.race.findUnique({
+      where: { id },
+      include: RACE_WITH_RELATIONS,
+    });
+    if (!dbRace) throw new NotFoundException(`Race ${id} not found.`);
 
-    if (race.status === 'RUNNING') {
+    if (dbRace.status === 'RUNNING') {
       throw new ConflictException(`Race ${id} is already running.`);
     }
-    if (race.status === 'FINISHED') {
+    if (dbRace.status === 'FINISHED') {
       throw new ConflictException(
         `Race ${id} has already been simulated. Create a new race to re-run.`,
       );
     }
 
-    race.status = 'RUNNING';
-    if (dto?.seed !== undefined) race.seed = dto.seed;
+    await this.prisma.race.update({
+      where: { id },
+      data: {
+        status: 'RUNNING',
+        ...(dto?.seed !== undefined ? { seed: dto.seed } : {}),
+      },
+    });
 
-    // Clear previous snapshots (in case of re-trigger after error)
-    race.snapshots = [];
+    const engineRace = toEngineRace(dbRace);
+    if (dto?.seed !== undefined) engineRace.seed = dto.seed;
 
-    runSimulation(race);
+    runSimulation(engineRace);
 
-    race.status = 'FINISHED';
-    race.finishedAt = new Date().toISOString();
+    // Persist each snapshot sequentially (createMany for cyclist rows per step).
+    for (const snapshot of engineRace.snapshots) {
+      const dbSnapshot = await this.prisma.raceSnapshot.create({
+        data: { raceId: id, km: snapshot.km },
+      });
+      await this.prisma.cyclistSnapshot.createMany({
+        data: toCyclistSnapshotInputs(dbSnapshot.id, snapshot),
+      });
+    }
 
-    return race;
+    const finishedAt = new Date();
+    await this.prisma.race.update({
+      where: { id },
+      data: { status: 'FINISHED', finishedAt },
+    });
+
+    engineRace.status = 'FINISHED';
+    engineRace.finishedAt = finishedAt.toISOString();
+    return engineRace;
   }
 
-  getRace(id: string): Race {
-    const race = this.store.get(id);
-    if (!race) throw new NotFoundException(`Race ${id} not found.`);
-    return race;
+  async getRace(id: string): Promise<Race> {
+    const dbRace = await this.prisma.race.findUnique({
+      where: { id },
+      include: RACE_WITH_RELATIONS,
+    });
+    if (!dbRace) throw new NotFoundException(`Race ${id} not found.`);
+    return toEngineRace(dbRace);
   }
 
-  getSnapshots(id: string) {
-    return this.getRace(id).snapshots;
+  async getSnapshots(id: string) {
+    await this.assertRaceExists(id);
+    const snapshots = await this.prisma.raceSnapshot.findMany({
+      where: { raceId: id },
+      include: SNAPSHOT_WITH_CHILDREN,
+      orderBy: { km: 'asc' },
+    });
+    return snapshots.map(toEngineSnapshot);
   }
 
-  getSnapshot(id: string, km: number) {
-    const snapshots = this.getSnapshots(id);
-    const snap = snapshots.find((s) => s.km === km);
+  async getSnapshot(id: string, km: number) {
+    const snap = await this.prisma.raceSnapshot.findUnique({
+      where: { raceId_km: { raceId: id, km } },
+      include: SNAPSHOT_WITH_CHILDREN,
+    });
     if (!snap)
       throw new NotFoundException(`No snapshot at km ${km} for race ${id}.`);
-    return snap;
+    return toEngineSnapshot(snap);
   }
 
-  listRaces(): Pick<Race, 'id' | 'name' | 'totalDistance' | 'status' | 'createdAt' | 'finishedAt'>[] {
-    return [...this.store.values()].map(
-      ({ id, name, totalDistance, status, createdAt, finishedAt }) => ({
-        id,
-        name,
-        totalDistance,
-        status,
-        createdAt,
-        finishedAt,
-      }),
-    );
+  async listRaces() {
+    return this.prisma.race.findMany({
+      select: {
+        id: true,
+        name: true,
+        totalDistance: true,
+        status: true,
+        createdAt: true,
+        finishedAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
-  getLeaderboard(id: string) {
-    const race = this.getRace(id);
-    if (race.status !== 'FINISHED') {
+  async getLeaderboard(id: string) {
+    const dbRace = await this.prisma.race.findUnique({ where: { id } });
+    if (!dbRace) throw new NotFoundException(`Race ${id} not found.`);
+    if (dbRace.status !== 'FINISHED') {
       throw new ConflictException(`Race ${id} has not been simulated yet.`);
     }
-    const last = race.snapshots[race.snapshots.length - 1];
-    return [...last.cyclists]
-      .sort((a, b) => b.position - a.position)
-      .map((c, i) => ({ rank: i + 1, ...c }));
+
+    const lastSnapshot = await this.prisma.raceSnapshot.findFirst({
+      where: { raceId: id },
+      orderBy: { km: 'desc' },
+      include: SNAPSHOT_WITH_CHILDREN,
+    });
+    if (!lastSnapshot) throw new NotFoundException(`No snapshots for race ${id}.`);
+
+    return [...lastSnapshot.cyclistSnapshots]
+      .sort((a, b) => {
+        if (a.finishPosition != null && b.finishPosition != null)
+          return a.finishPosition - b.finishPosition;
+        if (b.position !== a.position) return b.position - a.position;
+        return b.speed - a.speed;
+      })
+      .map((cs, i) => ({
+        rank: i + 1,
+        id: cs.cyclist.id,
+        name: cs.cyclist.name,
+        teamId: cs.cyclist.teamId,
+        position: cs.position,
+        speed: cs.speed,
+        energy: cs.energy,
+        intent: cs.intent ?? undefined,
+        groupId: cs.groupId ?? undefined,
+        isDropped: cs.isDropped,
+        finishPosition: cs.finishPosition ?? undefined,
+      }));
+  }
+
+  private async assertRaceExists(id: string): Promise<void> {
+    const exists = await this.prisma.race.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    if (!exists) throw new NotFoundException(`Race ${id} not found.`);
   }
 }
