@@ -5,10 +5,17 @@ import {
   UnprocessableEntityException,
   Logger,
 } from '@nestjs/common';
+import { RaceStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { Race } from '../engine/models/race';
 import { runSimulation } from '../engine/core/simulation';
-import { CreateRaceDto, CreateSimpleRaceDto, SimulateRaceDto, AddSegmentsDto } from './race.dto';
+import {
+  CreateRaceDto,
+  CreateSimpleRaceDto,
+  SimulateRaceDto,
+  AddSegmentsDto,
+  RegisterForRaceDto,
+} from './race.dto';
 import {
   toEngineRace,
   toEngineSnapshot,
@@ -102,6 +109,7 @@ export class RaceService {
         totalDistance: 0,
         seasonId: dto.seasonId,
         raceType: 'SINGLE',
+        ...(dto.status ? { status: dto.status as RaceStatus } : {}),
       },
       select: {
         id: true,
@@ -118,11 +126,21 @@ export class RaceService {
   async addSegments(id: string, dto: AddSegmentsDto) {
     const race = await this.prisma.race.findUnique({
       where: { id },
-      select: { id: true, status: true, segments: { select: { endKm: true }, orderBy: { endKm: 'desc' }, take: 1 } },
+      select: {
+        id: true,
+        status: true,
+        segments: {
+          select: { endKm: true },
+          orderBy: { endKm: 'desc' },
+          take: 1,
+        },
+      },
     });
     if (!race) throw new NotFoundException(`Race ${id} not found.`);
-    if (race.status !== 'PENDING') {
-      throw new ConflictException(`Cannot add segments to a race with status ${race.status}.`);
+    if (race.status !== 'DRAFT') {
+      throw new ConflictException(
+        `Cannot add segments to a race with status ${race.status}.`,
+      );
     }
 
     let cursor = race.segments[0]?.endKm ?? 0;
@@ -135,10 +153,16 @@ export class RaceService {
 
     await this.prisma.$transaction([
       this.prisma.segment.createMany({ data: segmentData }),
-      this.prisma.race.update({ where: { id }, data: { totalDistance: cursor } }),
+      this.prisma.race.update({
+        where: { id },
+        data: { totalDistance: cursor },
+      }),
     ]);
 
-    return this.prisma.segment.findMany({ where: { raceId: id }, orderBy: { startKm: 'asc' } });
+    return this.prisma.segment.findMany({
+      where: { raceId: id },
+      orderBy: { startKm: 'asc' },
+    });
   }
 
   async simulate(id: string, dto?: SimulateRaceDto): Promise<Race> {
@@ -272,6 +296,167 @@ export class RaceService {
         isDropped: cs.isDropped,
         finishPosition: cs.finishPosition ?? undefined,
       }));
+  }
+
+  async getStartlist(id: string) {
+    await this.assertRaceExists(id);
+
+    const entries = await this.prisma.raceEntry.findMany({
+      where: { raceId: id },
+      include: {
+        cyclist: { select: { id: true, name: true } },
+        team: { select: { id: true, name: true } },
+      },
+      orderBy: [{ teamId: 'asc' }, { isLeader: 'desc' }],
+    });
+
+    const teamMap = new Map<
+      string,
+      { id: string; name: string; cyclists: object[] }
+    >();
+    for (const entry of entries) {
+      if (!teamMap.has(entry.teamId)) {
+        teamMap.set(entry.teamId, {
+          id: entry.teamId,
+          name: entry.team.name,
+          cyclists: [],
+        });
+      }
+      teamMap.get(entry.teamId)!.cyclists.push({
+        id: entry.cyclist.id,
+        name: entry.cyclist.name,
+        role: entry.role,
+        isLeader: entry.isLeader,
+        startNumber: entry.startNumber ?? null,
+      });
+    }
+
+    return { teams: [...teamMap.values()] };
+  }
+
+  async closeStartlist(raceId: string) {
+    const race = await this.prisma.race.findUnique({
+      where: { id: raceId },
+      select: { id: true, status: true },
+    });
+    if (!race) throw new NotFoundException(`Race ${raceId} not found.`);
+    if (race.status !== 'OPEN') {
+      throw new ConflictException(
+        `Cannot close startlist for a race with status ${race.status}.`,
+      );
+    }
+
+    const entries = await this.prisma.raceEntry.findMany({
+      where: { raceId },
+      orderBy: [{ teamId: 'asc' }, { isLeader: 'desc' }, { id: 'asc' }],
+    });
+
+    const teamMap = new Map<string, typeof entries>();
+    for (const entry of entries) {
+      if (!teamMap.has(entry.teamId)) teamMap.set(entry.teamId, []);
+      teamMap.get(entry.teamId)!.push(entry);
+    }
+
+    const assignments: { id: string; startNumber: number }[] = [];
+    let teamIndex = 1;
+    for (const cyclists of teamMap.values()) {
+      cyclists.forEach((entry, j) => {
+        assignments.push({ id: entry.id, startNumber: (teamIndex - 1) * 10 + (j + 1) });
+      });
+      teamIndex++;
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await Promise.all(
+        assignments.map(({ id, startNumber }) =>
+          tx.raceEntry.update({ where: { id }, data: { startNumber } }),
+        ),
+      );
+      return tx.race.update({
+        where: { id: raceId },
+        data: { status: 'PENDING' },
+        select: { id: true, name: true, status: true, totalDistance: true, createdAt: true, finishedAt: true },
+      });
+    });
+  }
+
+  async registerForRace(
+    userId: string,
+    raceId: string,
+    dto: RegisterForRaceDto,
+  ) {
+    const race = await this.prisma.race.findUnique({
+      where: { id: raceId },
+      select: { id: true, status: true },
+    });
+    if (!race) throw new NotFoundException(`Race ${raceId} not found.`);
+    if (race.status !== 'OPEN') {
+      throw new ConflictException(
+        `Cannot register for a race with status ${race.status}.`,
+      );
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { teamId: true },
+    });
+    if (!user?.teamId) {
+      throw new UnprocessableEntityException('You do not have a team.');
+    }
+    const teamId = user.teamId;
+
+    if (dto.entries.length > 0) {
+      const cyclistIds = dto.entries.map((e) => e.cyclistId);
+      const cyclists = await this.prisma.cyclist.findMany({
+        where: { id: { in: cyclistIds }, teamId },
+        select: { id: true },
+      });
+      if (cyclists.length !== cyclistIds.length) {
+        const found = new Set(cyclists.map((c) => c.id));
+        const invalid = cyclistIds.filter((id) => !found.has(id));
+        throw new UnprocessableEntityException(
+          `Cyclists do not belong to your team: ${invalid.join(', ')}`,
+        );
+      }
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.raceEntry.deleteMany({ where: { raceId, teamId } }),
+      this.prisma.raceEntry.createMany({
+        data: dto.entries.map((e) => ({
+          raceId,
+          teamId,
+          cyclistId: e.cyclistId,
+          isLeader: e.isLeader,
+          role: e.role,
+        })),
+      }),
+    ]);
+
+    // Ensure RaceTeam junction exists (upsert not available on composite PK with createMany workaround)
+    await this.prisma.raceTeam.upsert({
+      where: { raceId_teamId: { raceId, teamId } },
+      update: {},
+      create: { raceId, teamId },
+    });
+
+    return this.prisma.raceEntry.findMany({
+      where: { raceId, teamId },
+      include: { cyclist: { select: { id: true, name: true } } },
+    });
+  }
+
+  async getMyRaceEntries(userId: string, raceId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { teamId: true },
+    });
+    if (!user?.teamId) return [];
+
+    return this.prisma.raceEntry.findMany({
+      where: { raceId, teamId: user.teamId },
+      include: { cyclist: { select: { id: true, name: true } } },
+    });
   }
 
   private async assertRaceExists(id: string): Promise<void> {

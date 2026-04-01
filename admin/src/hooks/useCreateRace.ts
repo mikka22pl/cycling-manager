@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { api, RaceSummary } from '../api/client'
+import { api, RaceSummary, RaceStatus } from '../api/client'
 
-type CreateRacePayload = { name: string; seasonId: string }
+type CreateRacePayload = { name: string; seasonId: string; status?: RaceStatus }
 
 export function useCreateRace() {
   const queryClient = useQueryClient()

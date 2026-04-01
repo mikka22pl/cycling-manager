@@ -8,6 +8,7 @@ export class CreateRaceGroupDto {
   name: string;
   seasonId: string;
   stages: StageDto[];
+  status?: 'DRAFT' | 'OPEN';
 }
 
 export type RaceGroupResult = {

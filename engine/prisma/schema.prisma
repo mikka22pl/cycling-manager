@@ -8,7 +8,15 @@ datasource db {
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
+enum SeasonStatus {
+  DRAFT
+  CURRENT
+  CLOSED
+}
+
 enum RaceStatus {
+  DRAFT
+  OPEN
   PENDING
   RUNNING
   FINISHED
@@ -38,12 +46,21 @@ enum WindDirection {
   cross
 }
 
+enum CyclistRole {
+  LEADER
+  DOMESTIQUE
+  SPRINTER
+  CLIMBER
+  ROULEUR
+}
+
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 model Season {
-  id         String      @id @default(uuid())
-  year       Int         @unique
-  createdAt  DateTime    @default(now())
+  id         String       @id @default(uuid())
+  year       Int          @unique
+  status     SeasonStatus @default(DRAFT)
+  createdAt  DateTime     @default(now())
 
   races      Race[]
   raceGroups RaceGroup[]
@@ -73,10 +90,25 @@ model Team {
   domestiqueIds String[]
   createdAt     DateTime     @default(now())
 
-  cyclists  Cyclist[]
-  raceTeams RaceTeam[]
+  cyclists    Cyclist[]
+  raceTeams   RaceTeam[]
+  raceEntries RaceEntry[]
+  owner       User?
 
   @@map("teams")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  teamId    String?  @unique
+  team      Team?    @relation(fields: [teamId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
 }
 
 model Cyclist {
@@ -94,6 +126,7 @@ model Cyclist {
   createdAt   DateTime @default(now())
 
   cyclistSnapshots CyclistSnapshot[]
+  raceEntries      RaceEntry[]
 
   @@map("cyclists")
 }
@@ -102,7 +135,7 @@ model Race {
   id            String     @id @default(uuid())
   name          String
   totalDistance Float
-  status        RaceStatus @default(PENDING)
+  status        RaceStatus @default(DRAFT)
   seed          Int?
   cyclistIds    String[]   @default([])
   raceType      RaceType   @default(SINGLE)
@@ -112,13 +145,30 @@ model Race {
   createdAt     DateTime   @default(now())
   finishedAt    DateTime?
 
-  season    Season?    @relation(fields: [seasonId], references: [id])
-  raceGroup RaceGroup? @relation(fields: [raceGroupId], references: [id])
-  segments  Segment[]
-  raceTeams RaceTeam[]
-  snapshots RaceSnapshot[]
+  season      Season?     @relation(fields: [seasonId], references: [id])
+  raceGroup   RaceGroup?  @relation(fields: [raceGroupId], references: [id])
+  segments    Segment[]
+  raceTeams   RaceTeam[]
+  raceEntries RaceEntry[]
+  snapshots   RaceSnapshot[]
 
   @@map("races")
+}
+
+model RaceEntry {
+  id        String      @id @default(uuid())
+  raceId    String
+  race      Race        @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  teamId    String
+  team      Team        @relation(fields: [teamId], references: [id])
+  cyclistId   String
+  cyclist     Cyclist     @relation(fields: [cyclistId], references: [id])
+  startNumber Int?
+  isLeader    Boolean     @default(false)
+  role        CyclistRole
+
+  @@unique([raceId, cyclistId])
+  @@map("race_entries")
 }
 
 model RaceTeam {

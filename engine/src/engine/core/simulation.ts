@@ -132,7 +132,6 @@ export function runSimulation(race: Race): RaceSnapshot[] {
         rng,
         formFactors.get(cyclist.id) ?? 1.0,
       );
-      Logger.log('speed ' + cyclist.name + ' : ' + speed);
 
       const { fatigue, energy } = computeFatigueUpdate(
         cyclist,

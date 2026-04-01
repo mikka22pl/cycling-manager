@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { RaceStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateRaceGroupDto, RaceGroupResult } from './race-group.dto';
 
@@ -29,6 +30,7 @@ export class RaceGroupService {
             raceType: 'STAGE',
             stageNumber: index + 1,
             seasonId: dto.seasonId,
+            ...(dto.status ? { status: dto.status as RaceStatus } : {}),
           })),
         },
       },

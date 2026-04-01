@@ -11,6 +11,7 @@ export function CreateRaceModal({ seasonId, onClose }: Props) {
   const [raceType, setRaceType] = useState<'SINGLE' | 'STAGED'>('SINGLE')
   const [name, setName] = useState('')
   const [stages, setStages] = useState(['', ''])
+  const [openRace, setOpenRace] = useState(false)
 
   const { mutate: createRace, isPending: racePending, error: raceError } = useCreateRace()
   const { mutate: createRaceGroup, isPending: groupPending, error: groupError } = useCreateRaceGroup()
@@ -27,13 +28,14 @@ export function CreateRaceModal({ seasonId, onClose }: Props) {
     e.preventDefault()
     if (!name.trim()) return
 
+    const status = openRace ? 'OPEN' : 'DRAFT'
     if (raceType === 'SINGLE') {
-      createRace({ name: name.trim(), seasonId }, { onSuccess: onClose })
+      createRace({ name: name.trim(), seasonId, status }, { onSuccess: onClose })
     } else {
       const validStages = stages.map((s) => s.trim()).filter(Boolean)
       if (validStages.length < 2) return
       createRaceGroup(
-        { name: name.trim(), seasonId, stages: validStages.map((s) => ({ name: s })) },
+        { name: name.trim(), seasonId, stages: validStages.map((s) => ({ name: s })), status },
         { onSuccess: onClose },
       )
     }
@@ -130,6 +132,17 @@ export function CreateRaceModal({ seasonId, onClose }: Props) {
               </button>
             </div>
           )}
+
+          {/* Open Race */}
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={openRace}
+              onChange={(e) => setOpenRace(e.target.checked)}
+              className="accent-gray-900"
+            />
+            <span className="text-sm font-medium text-gray-700">Open Race</span>
+          </label>
 
           {error && (
             <p className="text-sm text-red-500">{error.message}</p>

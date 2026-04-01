@@ -1,3 +1,5 @@
+import client from './client'
+
 export interface CreateTeamPayload {
   name: string
   townName: string
@@ -20,15 +22,21 @@ export interface TeamResponse {
   }>
 }
 
-export async function createTeam(payload: CreateTeamPayload): Promise<TeamResponse> {
-  const res = await fetch('/api/team/generate', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+export async function createTeam(payload: CreateTeamPayload, token: string): Promise<TeamResponse> {
+  const res = await client.post<TeamResponse>('/team/generate', payload, {
+    headers: { Authorization: `Bearer ${token}` },
   })
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error(text || `Request failed: ${res.status}`)
+  return res.data
+}
+
+export async function getMyTeam(token: string): Promise<TeamResponse | null> {
+  try {
+    const res = await client.get<TeamResponse>('/team/my', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    return res.data
+  } catch (err: any) {
+    if (err?.response?.status === 404) return null
+    throw err
   }
-  return res.json() as Promise<TeamResponse>
 }
