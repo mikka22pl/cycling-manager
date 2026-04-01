@@ -21,10 +21,11 @@ export type SeasonRaceDto = {
   id: string;
   name: string;
   raceType: 'SINGLE' | 'STAGE';
+  totalDistance: number;
   stageNumber: number | null;
   raceGroupId: string | null;
   raceGroupName: string | null;
-  status: 'PENDING' | 'RUNNING' | 'FINISHED';
+  status: 'DRAFT' | 'OPEN' | 'PENDING' | 'RUNNING' | 'FINISHED';
   winner: WinnerDto | null;
 };
 

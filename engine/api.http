@@ -1,0 +1,136 @@
+### log in 
+
+POST http://localhost:3000/auth/login HTTP/1.1
+Content-Type: application/json
+
+{
+  "email": "folke@wp.pl",
+  "password": "test123"
+}
+
+
+### generate TEAM
+
+POST http://localhost:3000/team/generate HTTP/1.1
+Content-Type: application/json
+
+{
+  "name": "Team 4",
+  "numberOfRiders": 12,
+  "nationality": "POL"
+}
+
+### POST start the race
+
+POST http://localhost:3000/race/start
+Content-Type: application/json
+
+{
+  "name": "Tour de Test 10",
+  "totalDistance": 60,
+  "seed": 76,
+  "segments": [
+    { "startKm": 0, "endKm": 60, "type": "flat", "gradient": 0 },
+    { "startKm": 60, "endKm": 80, "type": "climb", "gradient": 5 }
+  ],
+  "teamIds": [
+    "6993f8d6-442a-4e1d-a792-5616e42b154d",
+    "12f0cdb4-813d-45ee-a1bc-bc302581a913",
+    "0dc80a2a-14c9-4f16-8802-df765dea5a44",
+    "5d971890-e4b5-4a7a-a248-63e2dc7645db",
+    "d5d5f8a5-7631-466f-8c50-52b8396d97f2",
+    "906d31c6-8f12-43b1-bb7d-6c3eb7c98c93",
+    "e40cc544-07f7-4e6a-a940-3677979f8b4e",
+    "5a41ac8a-3668-4a57-b977-fe57d9f17a0b",
+    "d8e4ed54-dfdd-4a4c-898b-2ee4e905d62c",
+    "7c9667f7-556f-4aa2-b0f6-936aaca7209d"
+  ],
+  "cyclistIds": [
+    "b9084548-d1ee-4fc1-82ed-dae94f7a5f72",
+    "317d141e-1259-4eac-b84e-40928f0df39f",
+    "7e5540c4-43cb-4cd7-a518-8d9bbd0d4b70",
+    "3a5811c8-6f5d-456f-8ff1-56a2b60eda8c",
+    "bcfdb0ea-59ea-4c43-a5ee-9c0800d3f057",
+    "6dd5a13a-7322-407c-8a1e-525d5aa60dfd",
+    "6e2b3196-dc60-4a81-8291-c76bfa1ffdd9",
+    "06d77a1d-29f6-4d86-8219-c7e42c905a6d",
+    "4c1ecedc-ae93-4e63-b40b-e92e7eaac35e",
+    "2fdfcf01-87fc-4861-9b5f-287f6b508953",
+    "1af62618-b6f2-4d93-b969-06972b22957b",
+    "dad27164-2336-4525-bbb8-07e301446ba2",
+    "c0892f10-95fa-459c-8df5-dc9769b43330",
+    "57760eee-8819-420b-aeb8-8d15f87674e0",
+    "c52a8aef-aeeb-46ec-a05c-fb7c331da922",
+    "743fbe8d-e654-4ad8-a318-f879d3b458b5",
+    "33857417-9f03-46a2-bd72-8f63326ea9fb",
+    "65fea9ee-a6c0-42ff-9908-60c41d4a9b1d",
+    "3355b6c8-2de8-41c7-8295-54e81ea596fa",
+    "72cf6239-773c-4473-bc33-25939f27890f",
+    "69e01441-faf2-447d-8c22-1e07a01b94c3",
+    "94018b32-842b-4df3-b671-b24d9cabc2b3",
+    "90b4e562-d659-492b-a77c-eb34e8548880",
+    "8933134e-eaae-44b8-9a79-a2ee465107e2",
+    "d9f69ff7-eb2c-48ff-8e58-e0c91861ab0b",
+    "15262fb0-1a72-4b48-8b8c-3b31301eef6b",
+    "f4a5ec4a-2d22-494b-95af-7f364b24325a",
+    "dd33cbcf-c942-49a9-b24a-83d60bfca769",
+    "98030d16-c98e-404c-88c4-180e9bd6de29",
+    "cd7d614d-443e-49f3-91fa-5ff7538d6257",
+    "0e0b7fd3-45e0-4a5b-8092-8bfe3cac6939",
+    "e5867d01-72b7-42f1-97df-6934ca26bd96",
+    "021b3dc0-5de4-46e8-b02b-ecd6eaefa1b6",
+    "9e6622b1-f2b3-42b0-8846-2c7453ea6215",
+    "e0e83891-be60-4570-add9-81e739529c11",
+    "fecda204-69c3-491d-baa6-848a38ed7b46",
+    "84f02154-b889-4ac1-902e-a22029f2ed08",
+    "8e537097-ea57-49f8-9255-c70b00b3c767",
+    "47c40a42-3dfc-4d5d-a162-4b8f87a9b917",
+    "0f594915-c01c-431e-8d10-bddacdbfde7a",
+    "bd29f9d7-e46d-4d5a-bb08-adb4bdd0ab0a",
+    "900ec178-289a-4ddc-8c04-7870f93386e4",
+    "6009bd52-075d-4ca6-84c5-2443f29b2bf5",
+    "74b6aa1e-95ec-46bc-be32-f5a492784b2b",
+    "326f40b1-ca38-4327-86c3-f1bfe8f9fcdd",
+    "34e8190c-ced7-4a57-ab9b-2034013a3580",
+    "7c0df16c-0511-4cd1-9a6e-76681cc24135",
+    "1e16c1c2-1d40-427c-bbb9-e2d93c09073f",
+    "ce03f86b-b6f7-4772-92df-112c9d5ac7ff",
+    "ef99ea40-f57f-41c7-a7d5-5472605355ec",
+    "ecaef74a-b91d-4704-b73b-896f73f82eef",
+    "fa9966c1-fd36-4d29-b905-079f5225074d",
+    "b8c4f44c-e701-45f4-b85f-26fb0ca15f82",
+    "c31262e9-7669-4871-9764-7b0bb8f194cb",
+    "0811c737-2ecd-4a3c-b2d1-e475fd3a232e",
+    "b1e0628c-5854-46e4-b0eb-b138feaf5a42",
+    "4d97eaf0-6648-46fd-8b3e-58b90c2f1da6",
+    "76ed5d4f-dd04-4ae3-951f-83db5475572e",
+    "01418cc0-4257-41d9-bb04-5c079ff7c0a8",
+    "11fef330-693c-4e38-a139-cb6f4408fb80"
+  ]
+}
+
+### POST /race/:id/segments — append segments to a PENDING race
+
+POST http://localhost:3000/race/RACE_ID_HERE/segments HTTP/1.1
+Content-Type: application/json
+
+{
+  "segments": [
+    { "distance": 40, "type": "flat",    "gradient": 0   },
+    { "distance": 15, "type": "climb",   "gradient": 6   },
+    { "distance":  5, "type": "descent", "gradient": -4  }
+  ]
+}
+
+### GET /race
+
+GET http://localhost:3000/race HTTP/1.1
+
+### POST /race/:id/simulate run the simulation
+
+POST http://localhost:3000/race/99685752-fc51-484c-81e9-3c8cd0e51cdd/simulate HTTP/1.1
+Content-Type: application/json
+
+### leaderboard
+
+GET http://localhost:3000/race/33f42b94-8ad4-47d1-a927-42546acabc81/leaderboard HTTP/1.1

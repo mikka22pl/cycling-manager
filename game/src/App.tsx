@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
 import RacesPage from './pages/RacesPage'
+import RaceDetailPage from './pages/RaceDetailPage'
 import TeamPage from './pages/TeamPage'
 import CreateTeamPage from './pages/CreateTeamPage'
 
@@ -33,6 +34,16 @@ export default function App() {
               <ProtectedRoute>
                 <AppLayout>
                   <RacesPage />
+                </AppLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/races/:id"
+            element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <RaceDetailPage />
                 </AppLayout>
               </ProtectedRoute>
             }

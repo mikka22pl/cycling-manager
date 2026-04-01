@@ -29,6 +29,7 @@ export class SimulateRaceDto {
 export class CreateSimpleRaceDto {
   name: string;
   seasonId: string;
+  status?: 'DRAFT' | 'OPEN';
 }
 
 export class AddSegmentItemDto {
@@ -39,4 +40,14 @@ export class AddSegmentItemDto {
 
 export class AddSegmentsDto {
   segments: AddSegmentItemDto[];
+}
+
+export class RegisterForRaceEntryDto {
+  cyclistId: string;
+  isLeader: boolean;
+  role: 'LEADER' | 'DOMESTIQUE' | 'SPRINTER' | 'CLIMBER' | 'ROULEUR';
+}
+
+export class RegisterForRaceDto {
+  entries: RegisterForRaceEntryDto[];
 }

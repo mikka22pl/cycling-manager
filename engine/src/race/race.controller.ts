@@ -7,9 +7,13 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import { RaceService } from './race.service';
-import { CreateRaceDto, CreateSimpleRaceDto, SimulateRaceDto, AddSegmentsDto } from './race.dto';
+import { CreateRaceDto, CreateSimpleRaceDto, SimulateRaceDto, AddSegmentsDto, RegisterForRaceDto } from './race.dto';
+import { JwtAuthGuard } from '../auth/jwt.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
+import type { JwtPayload } from '../auth/current-user.decorator';
 
 @Controller('race')
 export class RaceController {
@@ -90,5 +94,37 @@ export class RaceController {
   @Get(':id/leaderboard')
   getLeaderboard(@Param('id') id: string) {
     return this.raceService.getLeaderboard(id);
+  }
+
+  /** Startlist: all registered cyclists grouped by team. */
+  @Get(':id/startlist')
+  getStartlist(@Param('id') id: string) {
+    return this.raceService.getStartlist(id);
+  }
+
+  /** Close the startlist: assign start numbers and transition OPEN → PENDING. */
+  @Post(':id/close-startlist')
+  @HttpCode(HttpStatus.OK)
+  closeStartlist(@Param('id') id: string) {
+    return this.raceService.closeStartlist(id);
+  }
+
+  /** Register the authenticated user's cyclists for a race. */
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/register')
+  @HttpCode(HttpStatus.OK)
+  registerForRace(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: RegisterForRaceDto,
+  ) {
+    return this.raceService.registerForRace(user.sub, id, dto);
+  }
+
+  /** Get the authenticated user's race entries for a given race. */
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/my-entries')
+  getMyEntries(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.raceService.getMyRaceEntries(user.sub, id);
   }
 }

@@ -19,7 +19,7 @@ export type RaceSnapshot = {
   }[];
 };
 
-export type RaceStatus = 'PENDING' | 'RUNNING' | 'FINISHED';
+export type RaceStatus = 'DRAFT' | 'OPEN' | 'PENDING' | 'RUNNING' | 'FINISHED';
 
 export type Race = {
   id: string;

@@ -12,6 +12,12 @@ export class SeasonController {
     return this.seasonService.listSeasons();
   }
 
+  /** Get the current season (status = CURRENT), or null if none/ambiguous. */
+  @Get('current')
+  getCurrentSeason() {
+    return this.seasonService.getCurrentSeason();
+  }
+
   /** Create a new season. */
   @Post()
   @HttpCode(HttpStatus.CREATED)

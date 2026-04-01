@@ -33,6 +33,16 @@ export class SeasonService {
     };
   }
 
+  async getCurrentSeason(): Promise<SeasonSummary | null> {
+    const seasons = await this.prisma.season.findMany({
+      where: { status: 'CURRENT' },
+      include: { _count: { select: { races: true } } },
+    });
+    if (seasons.length !== 1) return null;
+    const s = seasons[0];
+    return { id: s.id, year: s.year, raceCount: s._count.races, createdAt: s.createdAt };
+  }
+
   async listSeasons(): Promise<SeasonSummary[]> {
     const seasons = await this.prisma.season.findMany({
       include: { _count: { select: { races: true } } },
@@ -66,6 +76,7 @@ export class SeasonService {
           id: race.id,
           name: race.name,
           raceType: race.raceType,
+          totalDistance: race.totalDistance,
           stageNumber: race.stageNumber,
           raceGroupId: race.raceGroupId,
           raceGroupName: race.raceGroup?.name ?? null,
