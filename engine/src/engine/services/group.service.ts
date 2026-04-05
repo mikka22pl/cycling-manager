@@ -1,6 +1,6 @@
 import { Cyclist } from '../models/cyclist';
 
-const GROUP_PROXIMITY_KM = 0.1; // 50 metres
+const GROUP_PROXIMITY_KM = 0.05; // 50 metres (spec §12.1)
 
 export type Group = {
   id: string;

@@ -181,6 +181,8 @@ export const api = {
     post<Segment[]>(`/race/${raceId}/segments`, { segments }),
   getStartlist: (raceId: string) =>
     get<Startlist>(`/race/${raceId}/startlist`),
+  openRace: (raceId: string) =>
+    post<RaceSummary>(`/race/${raceId}/open`, {}),
   closeStartlist: (raceId: string) =>
     post<RaceSummary>(`/race/${raceId}/close-startlist`, {}),
   simulateRace: (raceId: string) =>

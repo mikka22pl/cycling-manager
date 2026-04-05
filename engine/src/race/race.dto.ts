@@ -51,3 +51,8 @@ export class RegisterForRaceEntryDto {
 export class RegisterForRaceDto {
   entries: RegisterForRaceEntryDto[];
 }
+
+export class CopyStartlistDto {
+  from: number;
+  to: number;
+}

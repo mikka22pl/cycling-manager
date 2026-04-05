@@ -10,7 +10,13 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { RaceService } from './race.service';
-import { CreateRaceDto, CreateSimpleRaceDto, SimulateRaceDto, AddSegmentsDto, RegisterForRaceDto } from './race.dto';
+import {
+  CreateRaceDto,
+  CreateSimpleRaceDto,
+  SimulateRaceDto,
+  AddSegmentsDto,
+  RegisterForRaceDto,
+} from './race.dto';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { JwtPayload } from '../auth/current-user.decorator';
@@ -102,6 +108,13 @@ export class RaceController {
     return this.raceService.getStartlist(id);
   }
 
+  /** Open a race: transition DRAFT → OPEN (no more segments can be added). */
+  @Post(':id/open')
+  @HttpCode(HttpStatus.OK)
+  openRace(@Param('id') id: string) {
+    return this.raceService.openRace(id);
+  }
+
   /** Close the startlist: assign start numbers and transition OPEN → PENDING. */
   @Post(':id/close-startlist')
   @HttpCode(HttpStatus.OK)
@@ -119,6 +132,13 @@ export class RaceController {
     @Body() dto: RegisterForRaceDto,
   ) {
     return this.raceService.registerForRace(user.sub, id, dto);
+  }
+
+  /** Copy all startlist entries from one race to another. */
+  @Post('copy/startlist')
+  @HttpCode(HttpStatus.OK)
+  copyStartlist(@Body('from') from: number, @Body('to') to: number) {
+    return this.raceService.copyStartlist(String(from), String(to));
   }
 
   /** Get the authenticated user's race entries for a given race. */

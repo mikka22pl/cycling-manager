@@ -86,7 +86,7 @@ export function decideEffort(
   } else if (remainingKm < 10) {
     intent = sprint > 70 && energy > 60 ? 'SPRINT_PREP' : 'FOLLOW_PELOTON';
   } else if (isLeader && team.strategy === 'GENERAL_CLASSIFICATION') {
-    intent = energy < 40 ? 'SAVE_ENERGY' : 'PROTECT_LEADER';
+    intent = energy < 40 ? 'SAVE_ENERGY' : 'FOLLOW_PELOTON';
   } else if (inBreakaway) {
     intent = 'BREAKAWAY';
   } else if (

@@ -7,7 +7,6 @@ import { computeFatigueUpdate } from '../services/fatigue.service';
 import { resolveGroups, Group } from '../services/group.service';
 import { decideEffort } from '../services/tactics.service';
 import { createRng, SeededRandom } from '../utils/random';
-import { Logger } from '@nestjs/common';
 
 /** Finds the segment that covers a given km point. */
 function getSegmentAt(segments: Segment[], km: number): Segment {
@@ -71,24 +70,22 @@ export function runSimulation(race: Race): RaceSnapshot[] {
   const finishOrder: { cyclistId: string }[] = [];
   const finishedIds = new Set<string>();
 
-  // Initial group resolve so the first step has groupIds available
-  resolveGroups(race.cyclists);
-
   while (true) {
     const active = race.cyclists.filter(
       (c) => !c.dynamic.isDropped && !finishedIds.has(c.id),
     );
     if (active.length === 0) break;
 
-    const leaderPosition = Math.max(...active.map((c) => c.dynamic.position));
+    const leaderPosition = active.reduce(
+      (max, c) => Math.max(max, c.dynamic.position),
+      0,
+    );
     const remainingKm = race.totalDistance - leaderPosition;
     if (remainingKm <= 0) break;
 
     const stepKm = resolveStepDistance(remainingKm);
     // Fixed time reference: how many hours does this step represent at BASE_SPEED
     const stepTime = stepKm / BASE_SPEED;
-
-    const segment = getSegmentAt(race.segments, leaderPosition);
 
     // --- Phase 1: Resolve groups from current positions ---
     // This gives us group membership + group collective speed before anyone moves.
@@ -105,6 +102,9 @@ export function runSimulation(race: Race): RaceSnapshot[] {
       const team = teamMap.get(cyclist.teamId);
       if (!team) continue;
 
+      // Each cyclist may be on a different terrain section
+      const segment = getSegmentAt(race.segments, cyclist.dynamic.position);
+
       const { intent, effort } = decideEffort(
         cyclist,
         race.cyclists,
@@ -114,28 +114,27 @@ export function runSimulation(race: Race): RaceSnapshot[] {
       );
       cyclist.dynamic.intent = intent;
 
-      // Sprint stat boost in final km
-      let sprintAdjustedEffort = effort;
-      if (remainingKm < 3) {
-        const sprintBoost =
-          (cyclist.stats.sprint / 100) * (cyclist.dynamic.energy / 100) * 0.3;
-        sprintAdjustedEffort = Math.min(1.5, effort + sprintBoost);
-      }
-
       const groupSize = cyclistGroupMap.get(cyclist.id)?.cyclistIds.length ?? 1;
 
-      const speed = computeSpeed(
+      let speed = computeSpeed(
         cyclist,
         segment,
-        Math.max(1, groupSize),
-        sprintAdjustedEffort,
+        groupSize,
+        effort,
         rng,
         formFactors.get(cyclist.id) ?? 1.0,
       );
 
+      // Sprint stat boost applied to final speed (spec §13.3: speed *= 1 + sprintBoost)
+      if (remainingKm < 3) {
+        const sprintBoost =
+          (cyclist.stats.sprint / 100) * (cyclist.dynamic.energy / 100) * 0.3;
+        speed *= 1 + sprintBoost;
+      }
+
       const { fatigue, energy } = computeFatigueUpdate(
         cyclist,
-        sprintAdjustedEffort,
+        effort,
         segment,
         rng,
       );
@@ -196,11 +195,18 @@ export function runSimulation(race: Race): RaceSnapshot[] {
     }
 
     // --- Phase 5: Re-resolve groups for correct groupIds in the snapshot ---
-    resolveGroups(race.cyclists.filter((c) => !c.dynamic.isDropped));
+    // Exclude finished riders (same set as Phase 1) to prevent them from
+    // artificially merging with riders still approaching the finish line.
+    resolveGroups(
+      race.cyclists.filter(
+        (c) => !c.dynamic.isDropped && !finishedIds.has(c.id),
+      ),
+    );
 
     // --- Phase 6: Save snapshot ---
-    const actualLeaderKm = Math.max(
-      ...race.cyclists.map((c) => c.dynamic.position),
+    const actualLeaderKm = race.cyclists.reduce(
+      (max, c) => Math.max(max, c.dynamic.position),
+      0,
     );
     const snapshotKm = parseFloat(actualLeaderKm.toFixed(3));
     const snapshot = buildSnapshot(snapshotKm, race.cyclists);

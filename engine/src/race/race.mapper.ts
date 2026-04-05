@@ -21,6 +21,7 @@ type PrismaRaceWithRelations = PrismaRace & {
   raceTeams: (PrismaRaceTeam & {
     team: PrismaTeam & { cyclists: PrismaCyclist[] };
   })[];
+  raceEntries?: { cyclistId: string }[];
   snapshots?: (PrismaRaceSnapshot & {
     cyclistSnapshots: (PrismaCyclistSnapshot & { cyclist: PrismaCyclist })[];
   })[];
@@ -115,7 +116,9 @@ export function toEngineRace(dbRace: PrismaRaceWithRelations): Race {
   for (const team of teams) {
     teamNamesMap.set(team.id, team.name);
   }
-  const rosterIds = new Set(dbRace.cyclistIds);
+  // Prefer RaceEntry registrations (new flow); fall back to legacy cyclistIds field.
+  const entryIds = dbRace.raceEntries?.map((e) => e.cyclistId) ?? [];
+  const rosterIds = new Set(entryIds.length > 0 ? entryIds : dbRace.cyclistIds);
   const cyclists: CyclistWithTeam[] = dbRace.raceTeams.flatMap((rt) =>
     rt.team.cyclists
       .filter((c) => rosterIds.size === 0 || rosterIds.has(c.id))
