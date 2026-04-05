@@ -38,11 +38,8 @@ export function computeSpeed(
   // --- Power ---
   const power = effort * (performance / 100) * effectiveEnergy;
 
-  // --- Sprint boost (<3 km is handled by effort=1.2, but add stat bonus) ---
-  const sprintBoost = 0; // injected upstream via effort
-
   // --- Final speed ---
-  const rawSpeed = BASE_SPEED * power * terrainFactor * (1 + sprintBoost);
+  const rawSpeed = BASE_SPEED * power * terrainFactor;
 
   // Wind effect
   let windFactor = 1;

@@ -26,6 +26,7 @@ import {
 const RACE_WITH_RELATIONS = {
   segments: true,
   raceTeams: { include: { team: { include: { cyclists: true } } } },
+  raceEntries: { select: { cyclistId: true } },
 } as const;
 
 /** Full include shape for a snapshot with its cyclist rows and parent cyclists. */
@@ -334,6 +335,24 @@ export class RaceService {
     return { teams: [...teamMap.values()] };
   }
 
+  async openRace(id: string) {
+    const race = await this.prisma.race.findUnique({
+      where: { id },
+      select: { id: true, status: true },
+    });
+    if (!race) throw new NotFoundException(`Race ${id} not found.`);
+    if (race.status !== 'DRAFT') {
+      throw new ConflictException(
+        `Cannot open a race with status ${race.status}.`,
+      );
+    }
+    return this.prisma.race.update({
+      where: { id },
+      data: { status: 'OPEN' },
+      select: { id: true, name: true, status: true, totalDistance: true, createdAt: true, finishedAt: true },
+    });
+  }
+
   async closeStartlist(raceId: string) {
     const race = await this.prisma.race.findUnique({
       where: { id: raceId },
@@ -457,6 +476,42 @@ export class RaceService {
       where: { raceId, teamId: user.teamId },
       include: { cyclist: { select: { id: true, name: true } } },
     });
+  }
+
+  async copyStartlist(fromId: string, toId: string) {
+    const [fromRace, toRace] = await Promise.all([
+      this.prisma.race.findUnique({
+        where: { id: fromId },
+        select: { id: true },
+      }),
+      this.prisma.race.findUnique({
+        where: { id: toId },
+        select: { id: true },
+      }),
+    ]);
+    if (!fromRace) throw new NotFoundException(`Race ${fromId} not found.`);
+    if (!toRace) throw new NotFoundException(`Race ${toId} not found.`);
+
+    const entries = await this.prisma.raceEntry.findMany({
+      where: { raceId: fromId },
+      select: { cyclistId: true, teamId: true, isLeader: true, role: true },
+    });
+
+    if (entries.length === 0) return { copied: 0 };
+
+    const teamIds = [...new Set(entries.map((e) => e.teamId))];
+
+    await this.prisma.raceTeam.createMany({
+      data: teamIds.map((teamId) => ({ raceId: toId, teamId })),
+      skipDuplicates: true,
+    });
+
+    await this.prisma.raceEntry.createMany({
+      data: entries.map((e) => ({ ...e, raceId: toId })),
+      skipDuplicates: true,
+    });
+
+    return { copied: entries.length };
   }
 
   private async assertRaceExists(id: string): Promise<void> {

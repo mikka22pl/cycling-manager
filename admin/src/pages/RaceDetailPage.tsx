@@ -11,6 +11,7 @@ import { LeaderboardGrid } from "../components/LeaderboardGrid";
 import { KmSlider } from "../components/KmSlider";
 import { StartlistView } from "../components/StartlistView";
 import { useCloseStartlist } from "../hooks/useCloseStartlist";
+import { useOpenRace } from "../hooks/useOpenRace";
 import { useSimulateRace } from "../hooks/useSimulateRace";
 import type { RaceStatus } from "../api/client";
 
@@ -71,6 +72,7 @@ export default function RaceDetailPage() {
   const isRunning = race?.status === "RUNNING";
   const isFinished = race?.status === "FINISHED";
 
+  const { mutate: openRace, isPending: isOpening } = useOpenRace(id!);
   const { mutate: closeStartlist, isPending: isClosing } = useCloseStartlist(id!);
   const { mutate: simulateRace, isPending: isSimulating } = useSimulateRace(id!);
 
@@ -134,6 +136,15 @@ export default function RaceDetailPage() {
         <div className="flex items-center gap-3 mb-5">
           <h1 className="text-xl font-semibold text-gray-900">{race.name}</h1>
           <StatusBadge status={race.status} />
+          {isDraft && (
+            <button
+              onClick={() => openRace()}
+              disabled={isOpening}
+              className="ml-auto px-3 py-1.5 text-xs font-medium rounded bg-blue-700 text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isOpening ? "Opening…" : "Open"}
+            </button>
+          )}
           {isOpen && (
             <button
               onClick={() => closeStartlist()}
